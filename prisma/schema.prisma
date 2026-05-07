@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  
+}
+
+model User {
+   id String @id @default(cuid())
+   email String @unique
+   username String @unique
+   clerkId String @unique
+   name String?
+   bio String?
+   image String?
+   location String?
+   website String?
+   createdAt DateTime @default(now()) //user since 2020
+    updatedAt DateTime @updatedAt
+
+    //Relations: One to Many
+    posts Post[]
+    comments Comment[]
+    likes Like[]
+
+    followers Follows[] @relation("UserFollowers")
+    following Follows[] @relation("UserFollowing")
+    notifications Notification[]  @relation("userNotifications")//recieves
+    notificationsCreated Notification[] @relation("notificationCreator")//creates
+}
+
+model Post {
+  id String @id @default(cuid())
+  authorId String   
+  content String?
+  image String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  //Relations
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade) // cascade delete means if a user is deleted, all their posts will be deleted as well
+  comments Comment[]
+  likes Like[]
+  notifications Notification[] 
+}
+
+model Comment {
+  id String @id @default(cuid())
+  content String
+  authorId String
+  postId String
+  createdAt DateTime @default(now())
+
+  //Relations
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+  
+  @@index([authorId, postId])
+}
+
+model Like {
+  id String @id @default(cuid())
+  postId String
+  userId String
+  createdAt DateTime @default(now())
+
+  //Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([userId, postId]) // composite index for faster queries on likes by user and post
+  @@unique([userId, postId]) // ensures a user can only like a post once
+}
+
+model Follows {
+
+  followerId String
+  followingId String
+  createdAt DateTime @default(now())
+
+  //Relations
+ follower User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@index([followerId, followingId]) // composite index for faster queries on followers and following
+  @@id ([followerId, followingId]) // composite primary key to prevent duplicate follow relationships
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String                  
+  creatorId String                  
+  type      NotificationType        
+  read      Boolean  @default(false)
+  postId    String?                 
+  commentId String?                
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user      User     @relation("userNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  creator   User     @relation("notificationCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  LIKE     
+  COMMENT 
+  FOLLOW   
+}
